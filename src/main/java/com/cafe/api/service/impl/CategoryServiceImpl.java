@@ -76,4 +76,16 @@ public class CategoryServiceImpl implements CategoryService {
 
         return ResponseEntity.ok("Category Updated Successfully");
     }
+
+    @Override
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> deleteCategory(Integer id) {
+        log.info("Inside deleteCategory");
+        Optional<Category> optional = categoryRepository.findById(id);
+        if (optional.isPresent()) {
+            categoryRepository.deleteById(id);
+            return ResponseEntity.ok("Category Deleted Successfully");
+        }
+        return new ResponseEntity<>("Category Not Found", HttpStatus.NOT_FOUND);
+    }
 }

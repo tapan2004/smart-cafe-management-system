@@ -13,4 +13,5 @@ public class UserResponseDTO {
     private String contactNumber;
     private String email;
     private Boolean status;
+    private String role;
 }

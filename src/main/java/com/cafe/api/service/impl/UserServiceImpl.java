@@ -47,7 +47,7 @@ public class UserServiceImpl implements UserService {
         user.setContactNumber(request.getContactNumber());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setStatus(false);
+        user.setStatus(true);
         user.setRoles(Set.of(staffRole));
 
         User savedUser = userRepository.save(user);
@@ -55,7 +55,7 @@ public class UserServiceImpl implements UserService {
                 savedUser.getEmail(),
                 "Registration Successful",
                 "Hello " + savedUser.getName() +
-                        ",\n\nYour account has been created successfully.\nPlease wait for admin approval."
+                        ",\n\nYour account has been created successfully.\nYou can now log in to the system."
         );
         return ResponseEntity.ok("User Registered Successfully");
     }
@@ -73,10 +73,6 @@ public class UserServiceImpl implements UserService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             return new ResponseEntity<>(
                     "Bad Credentials", HttpStatus.BAD_REQUEST);
-        }
-        if (!user.getStatus()) {
-            return new ResponseEntity<>(
-                    "Wait for admin approval", HttpStatus.BAD_REQUEST);
         }
         String token = jwtUtils.generateToken(user.getEmail());
         return ResponseEntity.ok(token);

@@ -88,6 +88,6 @@ public class JwtFilter extends OncePerRequestFilter {
                 .getAuthorities()
                 .stream()
                 .anyMatch(authority ->
-                        Objects.equals(authority.getAuthority(), "ADMIN"));
+                        Objects.equals(authority.getAuthority(), "ROLE_ADMIN"));
     }
 }

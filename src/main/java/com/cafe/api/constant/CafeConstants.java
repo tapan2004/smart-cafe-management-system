@@ -5,6 +5,9 @@ public class CafeConstants {
             "Something went wrong.";
 
     public static final String STORE_LOCATION =
-            "C:\\Users\\Tapan Manna\\Downloads";
+            "GeneratedBills";
+
+    public static final String INVALID_DATA =
+            "Invalid Data.";
 
 }

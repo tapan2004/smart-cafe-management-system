@@ -21,4 +21,7 @@ public interface BillController {
 
     @DeleteMapping("/delete/{id}")
     ResponseEntity<String> deleteBill(@PathVariable Integer id);
-}
+
+    @GetMapping("/getActiveOrders")
+    ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders();
+}

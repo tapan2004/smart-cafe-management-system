@@ -34,19 +34,31 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.google.zxing.client.j2se.MatrixToImageWriter.toBufferedImage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BillServiceImpl implements BillService {
+    private static final Logger log = LoggerFactory.getLogger(BillServiceImpl.class);
 
     private final BillRepository billRepository;
     private final ProductRepository productRepository;
+    private final com.cafe.api.repository.InventoryRepository inventoryRepository;
+    private final com.cafe.api.repository.IngredientRepository ingredientRepository;
     private final JwtFilter jwtFilter;
+    private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
+    private final com.cafe.api.service.EmailService emailService;
+    private final com.cafe.api.repository.AuditLogRepository auditLogRepository;
+
+    // Cache to prevent email flooding (Stock ID -> Last Email Time)
+    private final java.util.Map<Integer, Long> emailAlertTracker = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long EMAIL_THROTTLE_MS = 3600000; // 1 Hour Throttling
 
     // GENERATE REPORT
     @Override
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER','STAFF')")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<String> generateReport(BillRequestDTO request) {
 
         log.info("Inside generateReport");
@@ -68,17 +80,33 @@ public class BillServiceImpl implements BillService {
             }
 
             byte[] pdfBytes = generateInvoicePdf(request);
+            File directory = new File(CafeConstants.STORE_LOCATION);
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+
             try (FileOutputStream file =
-                         new FileOutputStream(CafeConstants.STORE_LOCATION + "\\" + fileName + ".pdf")) {
+                         new FileOutputStream(CafeConstants.STORE_LOCATION + File.separator + fileName + ".pdf")) {
                 file.write(pdfBytes);
             }
+
+            // Log to Audit Trail
+            auditLogRepository.save(new com.cafe.api.entity.AuditLog(
+                "BILL_GENERATED", 
+                jwtFilter.getCurrentUser(), 
+                "Generated Bill ID: " + fileName
+            ));
+
+            // BROADCAST TO KITCHEN
+            broadcastOrderToKitchen(request);
+
             return CafeUtils.getResponseEntity(
                     "Report Generated Successfully ID : " + fileName,
                     HttpStatus.OK
             );
 
-        } catch (Exception e) {
-            log.error("Error in generateReport", e);
+        } catch (Throwable e) {
+            log.error("CRITICAL ERROR in generateReport: {}", e.getMessage(), e);
             return CafeUtils.getResponseEntity(
                     CafeConstants.SOMETHING_WENT_WRONG,
                     HttpStatus.INTERNAL_SERVER_ERROR
@@ -111,28 +139,31 @@ public class BillServiceImpl implements BillService {
 
     // HEADER
     private void addHeader(Document document) throws Exception {
-        Image logo = Image.getInstance("src/main/resources/static/logo.png");
-        logo.scaleToFit(80, 80);
+        BaseColor coffeeColor = new BaseColor(163, 128, 104);
+        Font titleFont = new Font(Font.FontFamily.HELVETICA, 24, Font.BOLD, coffeeColor);
+        Font subTitleFont = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL, BaseColor.GRAY);
 
-        PdfPTable table = new PdfPTable(2);
+        PdfPTable table = new PdfPTable(1);
         table.setWidthPercentage(100);
-        table.setWidths(new int[]{1, 3});
 
-        PdfPCell logoCell = new PdfPCell(logo);
-        logoCell.setBorder(Rectangle.NO_BORDER);
-        table.addCell(logoCell);
+        PdfPCell titleCell = new PdfPCell(new Phrase("CAFEFLOW OPERATIONAL RECEIPT", titleFont));
+        titleCell.setBorder(Rectangle.NO_BORDER);
+        titleCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(titleCell);
 
-        Font titleFont = new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD);
-
-        PdfPCell textCell = new PdfPCell();
-        textCell.setBorder(Rectangle.NO_BORDER);
-
-        textCell.addElement(new Paragraph("Cafe Management System", titleFont));
-        textCell.addElement(new Paragraph("Kolkata, India"));
-        textCell.addElement(new Paragraph("Phone: +91 XXXXX XXXXX"));
-        table.addCell(textCell);
+        PdfPCell subTitleCell = new PdfPCell(new Phrase("PREMIUM BREWS & DIGITAL TRANSACTIONS", subTitleFont));
+        subTitleCell.setBorder(Rectangle.NO_BORDER);
+        subTitleCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        subTitleCell.setPaddingBottom(20);
+        table.addCell(subTitleCell);
 
         document.add(table);
+        
+        // Add a line separator
+        LineSeparator ls = new LineSeparator();
+        ls.setLineColor(coffeeColor);
+        ls.setLineWidth(2f);
+        document.add(new Chunk(ls));
         document.add(new Paragraph(" "));
     }
 
@@ -214,59 +245,77 @@ public class BillServiceImpl implements BillService {
     }
 
     private PdfPCell createHeader(String text, Font font) {
-        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        BaseColor coffeeColor = new BaseColor(163, 128, 104);
+        PdfPCell cell = new PdfPCell(new Phrase(text.toUpperCase(), new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, BaseColor.WHITE)));
 
-        cell.setBackgroundColor(new BaseColor(230, 230, 230));
+        cell.setBackgroundColor(coffeeColor);
         cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        cell.setPadding(6);
+        cell.setPadding(8);
+        cell.setBorderColor(BaseColor.WHITE);
         return cell;
     }
 
     // BILL SUMMARY
     private void addBillingSummary(Document document, BillRequestDTO request) throws Exception {
-
-        Optional<Bill> billOptional =
-                billRepository.findBillWithItems(request.getUuid());
+        BaseColor coffeeColor = new BaseColor(163, 128, 104);
+        Optional<Bill> billOptional = billRepository.findBillWithItems(request.getUuid());
 
         double subtotal = billOptional.map(Bill::getTotal).orElse(0.0);
-        double gst = subtotal * 0.18;
-        double total = subtotal + gst;
+        double tax = subtotal * 0.05; // 5% Special Service Tax
+        double total = subtotal + tax;
 
         PdfPTable table = new PdfPTable(2);
-        table.setWidthPercentage(35);
+        table.setWidthPercentage(40);
         table.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        table.setSpacingBefore(10);
+        table.setSpacingBefore(20);
 
-        table.addCell("Subtotal");
-        table.addCell(String.format("₹ %.2f", subtotal));
+        Font normal = new Font(Font.FontFamily.HELVETICA, 10);
+        Font boldWhite = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD, BaseColor.WHITE);
 
-        table.addCell("GST (18%)");
-        table.addCell(String.format("₹ %.2f", gst));
-        Font bold = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD);
+        addSummaryRow(table, "Gross Value", String.format("₹ %.2f", subtotal), normal);
+        addSummaryRow(table, "Service Tax (5%)", String.format("₹ %.2f", tax), normal);
 
-        PdfPCell totalText = new PdfPCell(new Phrase("Total", bold));
-        PdfPCell totalValue = new PdfPCell(new Phrase(String.format("₹ %.2f", total), bold));
+        PdfPCell totalLabel = new PdfPCell(new Phrase("GRAND TOTAL", boldWhite));
+        totalLabel.setBackgroundColor(coffeeColor);
+        totalLabel.setPadding(10);
+        totalLabel.setBorder(Rectangle.NO_BORDER);
 
-        totalText.setBorder(Rectangle.TOP);
-        totalValue.setBorder(Rectangle.TOP);
-        totalValue.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        PdfPCell totalVal = new PdfPCell(new Phrase(String.format("₹ %.2f", total), boldWhite));
+        totalVal.setBackgroundColor(coffeeColor);
+        totalVal.setPadding(10);
+        totalVal.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        totalVal.setBorder(Rectangle.NO_BORDER);
 
-        table.addCell(totalText);
-        table.addCell(totalValue);
+        table.addCell(totalLabel);
+        table.addCell(totalVal);
+        
         document.add(table);
+    }
+
+    private void addSummaryRow(PdfPTable table, String label, String value, Font font) {
+        PdfPCell lCell = new PdfPCell(new Phrase(label, font));
+        lCell.setBorder(Rectangle.NO_BORDER);
+        lCell.setPaddingBottom(5);
+        
+        PdfPCell vCell = new PdfPCell(new Phrase(value, font));
+        vCell.setBorder(Rectangle.NO_BORDER);
+        vCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        vCell.setPaddingBottom(5);
+        
+        table.addCell(lCell);
+        table.addCell(vCell);
     }
 
     // UPI QR
     private void addUPIQR(Document document, BillRequestDTO request) throws Exception {
-
-        Optional<Bill> billOptional = billRepository.findBillWithItems(request.getUuid());
-        double amount = billOptional.map(Bill::getTotal).orElse(0.0);
-
-        String upi =
-                "upi://pay?pa=cafe@upi&pn=CafeManagement&am=" + amount + "&cu=INR";
+        Optional<Bill> billOptional = billRepository.findByUuid(request.getUuid());
+        double total = billOptional.map(b -> b.getTotal() * 1.05).orElse(0.0); // Total with tax
+        
+        // Dynamic UPI Link: upi://pay?pa=VPA&pn=NAME&am=AMOUNT&cu=CURRENCY
+        String upiPayload = String.format("upi://pay?pa=cafeflow@upi&pn=CafeFlow&am=%.2f&cu=INR", total);
 
         QRCodeWriter writer = new QRCodeWriter();
-        BitMatrix matrix = writer.encode(upi, BarcodeFormat.QR_CODE, 180, 180);
+        BitMatrix matrix = writer.encode(upiPayload, BarcodeFormat.QR_CODE, 180, 180);
         BufferedImage image = toBufferedImage(matrix);
 
         Image qr = Image.getInstance(image, null);
@@ -308,9 +357,9 @@ public class BillServiceImpl implements BillService {
             Bill bill = new Bill();
 
             bill.setUuid(request.getUuid());
-            bill.setName(request.getName());
-            bill.setEmail(request.getEmail());
-            bill.setContactNumber(request.getContactNumber());
+            bill.setName(request.getName().trim());
+            bill.setEmail(request.getEmail().trim());
+            bill.setContactNumber(request.getContactNumber().trim());
             bill.setPaymentMethod(request.getPaymentMethod());
             bill.setCreatedBy(jwtFilter.getCurrentUser());
 
@@ -336,10 +385,72 @@ public class BillServiceImpl implements BillService {
             }
 
             bill.setTotal(total);
-            billRepository.save(bill);
+            billRepository.saveAndFlush(bill);
+
+            // PHASE 2: INVENTORY DEDUCTION
+            deductInventory(request);
+            
+            // Log to Audit Trail
+            auditLogRepository.save(new com.cafe.api.entity.AuditLog(
+                "BILL_GENERATED", 
+                jwtFilter.getCurrentUser(), 
+                "Generated Bill ID: " + bill.getUuid() + " for total ₹" + bill.getTotal()
+            ));
 
         } catch (Exception e) {
-            log.error("Error in insertBill", e);
+            log.error("Error in insertBill: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to insert bill", e);
+        }
+    }
+
+    private void deductInventory(BillRequestDTO request) {
+        for (BillItemRequestDTO itemDTO : request.getItems()) {
+            List<com.cafe.api.entity.inventory.ProductIngredient> ingredients = 
+                ingredientRepository.findByProductId(itemDTO.getProductId());
+            
+            for (com.cafe.api.entity.inventory.ProductIngredient ingredient : ingredients) {
+                com.cafe.api.entity.inventory.InventoryItem inventoryItem = ingredient.getInventoryItem();
+                if (inventoryItem == null) continue;
+
+                double totalReduction = ingredient.getQuantityRequired() * itemDTO.getQuantity();
+                double currentQty = (inventoryItem.getQuantity() != null) ? inventoryItem.getQuantity() : 0.0;
+                
+                inventoryItem.setQuantity(currentQty - totalReduction);
+                inventoryRepository.save(inventoryItem);
+                
+                if (inventoryItem.getQuantity() <= (inventoryItem.getLowStockThreshold() != null ? inventoryItem.getLowStockThreshold() : 0.0)) {
+                    log.warn("LOW STOCK ALERT: {} is at {}{}", 
+                        inventoryItem.getName(), inventoryItem.getQuantity(), inventoryItem.getUnit());
+                    
+                    sendStockAlertEmail(inventoryItem);
+                }
+            }
+        }
+    }
+
+    private void sendStockAlertEmail(com.cafe.api.entity.inventory.InventoryItem item) {
+        long now = System.currentTimeMillis();
+        Long lastEmail = emailAlertTracker.get(item.getId());
+        
+        if (lastEmail == null || (now - lastEmail) > EMAIL_THROTTLE_MS) {
+            try {
+                String subject = "CRITICAL STOCK ALERT: " + item.getName();
+                String body = String.format(
+                    "Tactical Inventory Update:\n\n" +
+                    "Item: %s\n" +
+                    "Current Level: %.2f %s\n" +
+                    "Threshold: %.2f %s\n\n" +
+                    "Action Required: RESTOCK IMMEDIATELY to prevent operational downtime.",
+                    item.getName(), item.getQuantity(), item.getUnit(), 
+                    item.getLowStockThreshold(), item.getUnit()
+                );
+                
+                emailService.sendSimpleMessage("admin@cafe.com", subject, body);
+                emailAlertTracker.put(item.getId(), now);
+                log.info("Stock alert email dispatched for {}", item.getName());
+            } catch (Exception e) {
+                log.error("Failed to send stock alert email for {}", item.getName(), e);
+            }
         }
     }
 
@@ -431,4 +542,52 @@ public class BillServiceImpl implements BillService {
                 HttpStatus.INTERNAL_SERVER_ERROR
         );
     }
-}
+
+    private void broadcastOrderToKitchen(BillRequestDTO request) {
+        try {
+            com.cafe.api.dto.response.OrderEventDTO event = com.cafe.api.dto.response.OrderEventDTO.builder()
+                    .uuid(request.getUuid())
+                    .customerName(request.getName())
+                    .status(com.cafe.api.entity.bill.OrderStatus.PLACED)
+                    .items(request.getItems().stream().map(item -> {
+                        Product product = productRepository.findById(item.getProductId()).orElse(null);
+                        return com.cafe.api.dto.response.OrderEventDTO.OrderItemDTO.builder()
+                                .productName(product != null ? product.getName() : "Unknown")
+                                .quantity(item.getQuantity())
+                                .categoryName(product != null && product.getCategory() != null ? product.getCategory().getName() : "General")
+                                .build();
+                    }).toList())
+                    .build();
+
+            log.info("Broadcasting order to kitchen: {}", request.getUuid());
+            messagingTemplate.convertAndSend("/topic/kitchen", event);
+        } catch (Exception e) {
+            log.error("Failed to broadcast order to kitchen", e);
+        }
+    }
+
+    @Override
+    public ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders() {
+        try {
+            List<com.cafe.api.entity.bill.Bill> activeBills = billRepository.findByStatusNot(com.cafe.api.entity.bill.OrderStatus.COMPLETED);
+            List<com.cafe.api.dto.response.OrderEventDTO> orderEvents = activeBills.stream().map(bill -> 
+                com.cafe.api.dto.response.OrderEventDTO.builder()
+                    .uuid(bill.getUuid())
+                    .customerName(bill.getName())
+                    .status(bill.getStatus())
+                    .items(bill.getItems().stream().map(item -> 
+                        com.cafe.api.dto.response.OrderEventDTO.OrderItemDTO.builder()
+                                .productName(item.getProduct().getName())
+                                .quantity(item.getQuantity())
+                                .categoryName(item.getProduct().getCategory().getName())
+                                .build()
+                    ).toList())
+                    .build()
+            ).toList();
+            return new ResponseEntity<>(orderEvents, HttpStatus.OK);
+        } catch (Exception e) {
+            log.error("Error fetching active orders", e);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+}

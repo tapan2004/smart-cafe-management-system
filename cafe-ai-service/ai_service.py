@@ -33,7 +33,6 @@ def get_sales_data():
             """
 
     df = pd.read_sql(query, connection)
-
     connection.close()
     return df
 
@@ -61,7 +60,6 @@ def predict_sales():
             "product": product,
             "predicted_sales": int(next_day)
         })
-
     return {"predictions": predictions}
 
 
@@ -96,7 +94,6 @@ def recommend(product_name: str):
 
     # Convert quantities to binary
     basket = (basket > 0).astype(int)
-
     frequent_items = apriori(
         basket,
         min_support=0.1,
@@ -136,7 +133,6 @@ def peak_hours():
 
     df = pd.read_sql(query, connection)
     connection.close()
-
     peak = []
 
     for _, row in df.iterrows():
@@ -164,7 +160,6 @@ def stock_prediction():
     stock_alerts = []
 
     for _, row in df.iterrows():
-
         product = row["name"]
         daily_usage = row["avg_daily_usage"]
         stock = 50
@@ -177,9 +172,7 @@ def stock_prediction():
             "product": product,
             "days_left": days_left
         })
-
     return {"stock_prediction": stock_alerts}
-
 
 # 5 SMART INSIGHTS
 @app.get("/smart-insights")
@@ -187,13 +180,11 @@ def smart_insights():
     df = get_sales_data()
     insights = []
     if not df.empty:
-
         product_sales = df.groupby("product")["qty"].sum()
         top_product = product_sales.idxmax()
         insights.append(
             f"{top_product} is the most popular item"
         )
-
         avg_sales = product_sales.mean()
         for product, sales in product_sales.items():
 
@@ -207,7 +198,6 @@ def smart_insights():
 # 6 Chat Endpoint
 @app.get("/chat")
 def chat(question: str):
-
     if "popular" in question:
         df = get_sales_data()
         top = df.groupby("product")["qty"].sum().idxmax()
@@ -219,9 +209,7 @@ def chat(question: str):
 # 7  Forecast Model
 @app.get("/forecast")
 def forecast():
-
     df = get_sales_data()
-
     if df.empty or len(df) < 2:
         return {
             "message": "Not enough data for forecasting",
@@ -230,42 +218,28 @@ def forecast():
 
     # aggregate sales per day
     df = df.groupby("day")["qty"].sum().reset_index()
-
     df = df.rename(columns={
         "day": "ds",
         "qty": "y"
     })
-
     model = Prophet()
     model.fit(df)
-
     future = model.make_future_dataframe(periods=1)
-
     forecast = model.predict(future)
-
     prediction = forecast.tail(1)["yhat"].values[0]
-
     return {
         "predicted_sales": int(prediction)
     }
 
 # 8 Dashboard API
-
 @app.get("/dashboard")
 def dashboard():
-
     sales_prediction = predict_sales()
-
     recommendations = recommend("Cappuccino")
-
     peak = peak_hours()
-
     stock = stock_prediction()
-
     insights = smart_insights()
-
     forecast_data = forecast()
-
     return {
         "sales_prediction": sales_prediction,
         "recommendations": recommendations,

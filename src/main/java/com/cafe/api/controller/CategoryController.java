@@ -16,4 +16,7 @@ public interface CategoryController {
 
     @PutMapping("/update")
     ResponseEntity<String> updateCategory(@RequestBody CategoryRequestDTO request);
+
+    @DeleteMapping("/delete/{id}")
+    ResponseEntity<String> deleteCategory(@PathVariable Integer id);
 }

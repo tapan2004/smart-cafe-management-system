@@ -15,7 +15,8 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     @Query("""
             SELECT new com.cafe.api.dto.response.UserResponseDTO(
-            u.id,u.name,u.contactNumber,u.email,u.status)
+            u.id,u.name,u.contactNumber,u.email,u.status,
+            CAST(r.userRole AS string))
             FROM User u JOIN u.roles r
             WHERE r.userRole='ROLE_STAFF'
             """)

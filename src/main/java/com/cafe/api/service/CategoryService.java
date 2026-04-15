@@ -14,4 +14,6 @@ public interface CategoryService {
     ResponseEntity<List<CategoryResponseDTO>> getAllCategories();
 
     ResponseEntity<String> updateCategory(CategoryRequestDTO request);
+
+    ResponseEntity<String> deleteCategory(Integer id);
 }

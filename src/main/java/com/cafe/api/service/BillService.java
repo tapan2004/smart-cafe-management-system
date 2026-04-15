@@ -15,4 +15,6 @@ public interface BillService {
     ResponseEntity<byte[]> getPdf(String request);
 
     ResponseEntity<String> deleteBill(Integer id);
-}
+
+    ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders();
+}

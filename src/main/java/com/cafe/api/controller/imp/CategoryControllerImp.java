@@ -29,4 +29,9 @@ public class CategoryControllerImp implements CategoryController {
     public ResponseEntity<String> updateCategory(CategoryRequestDTO request) {
         return categoryService.updateCategory(request);
     }
+
+    @Override
+    public ResponseEntity<String> deleteCategory(Integer id) {
+        return categoryService.deleteCategory(id);
+    }
 }

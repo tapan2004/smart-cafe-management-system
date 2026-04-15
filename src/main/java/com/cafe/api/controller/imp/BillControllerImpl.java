@@ -35,4 +35,9 @@ public class BillControllerImpl implements BillController {
     public ResponseEntity<String> deleteBill(Integer id) {
         return billService.deleteBill(id);
     }
-}
+
+    @Override
+    public ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders() {
+        return billService.getActiveOrders();
+    }
+}
