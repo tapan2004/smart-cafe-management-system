@@ -79,8 +79,14 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<String> deleteProduct(Integer id) {
-        productRepository.deleteById(id);
-        return ResponseEntity.ok("Product Deleted Successfully");
+        Optional<Product> optional = productRepository.findById(id);
+        if (optional.isPresent()) {
+            Product product = optional.get();
+            product.setDeleted(true);
+            productRepository.save(product);
+            return ResponseEntity.ok("Product Soft-Deleted Successfully");
+        }
+        return new ResponseEntity<>("Product Not Found", HttpStatus.NOT_FOUND);
     }
 
     @Override

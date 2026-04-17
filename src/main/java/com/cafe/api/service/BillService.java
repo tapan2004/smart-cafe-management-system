@@ -17,4 +17,6 @@ public interface BillService {
     ResponseEntity<String> deleteBill(Integer id);
 
     ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders();
-}
+
+    ResponseEntity<String> placePublicOrder(BillRequestDTO request);
+}

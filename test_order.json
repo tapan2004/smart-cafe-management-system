@@ -1,0 +1,9 @@
+{
+    "name": "Tapan",
+    "email": "tapan@example.com",
+    "contactNumber": "9876543210",
+    "tableNumber": "05",
+    "items": [
+        { "productId": 1, "quantity": 2 }
+    ]
+}

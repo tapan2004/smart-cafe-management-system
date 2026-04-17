@@ -15,8 +15,11 @@ import java.util.List;
 public class OrderEventDTO {
     private String uuid;
     private String customerName;
-    private String tableNumber; // For future use
+    private String tableNumber;
+    private String orderSource;
     private OrderStatus status;
+    private java.time.LocalDateTime placedAt;
+    private String priorityLevel; // "HIGH" or "NORMAL"
     private List<OrderItemDTO> items;
 
     @Data

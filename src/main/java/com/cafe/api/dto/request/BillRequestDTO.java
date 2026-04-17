@@ -16,4 +16,6 @@ public class BillRequestDTO {
     private String uuid;
    // private List<BillItemRequestDTO> products;
     private List<BillItemRequestDTO> items;
+    private String tableNumber;
+    private String orderSource;
 }

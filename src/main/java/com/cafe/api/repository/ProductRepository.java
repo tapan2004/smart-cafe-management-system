@@ -15,6 +15,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
              p.createdAt
              )
             FROM Product p
+            WHERE p.isDeleted = false
             """)
     List<ProductResponseDTO> getAllProducts();
 
@@ -26,7 +27,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         p.createdAt
         )
         FROM Product p
-        WHERE p.category.id=:id AND p.status=true
+        WHERE p.category.id=:id AND p.status=true AND p.isDeleted = false
         """)
     List<ProductResponseDTO> getProductsByCategory(Integer id);
 }

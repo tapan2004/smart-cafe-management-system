@@ -24,6 +24,8 @@ public class AIServiceImp implements AIService {
     private final DashboardRepository dashboardRepository;
     private final BillRepository billRepository;
     private final ProductRepository productRepository;
+    private final com.cafe.api.repository.InventoryRepository inventoryRepository;
+    private final com.cafe.api.repository.IngredientRepository ingredientRepository;
 
     private final RestTemplate restTemplate = new RestTemplate();
     private static final String AI_URL = "http://localhost:8000";
@@ -77,8 +79,46 @@ public class AIServiceImp implements AIService {
     @Override
     public Map getStockPrediction() {
         Map<String, Object> result = new HashMap<>();
-        result.put("totalProducts", productRepository.count());
-        result.put("reorderRecommendation", "Check ingredients linked to top-selling items.");
+        List<Map<String, Object>> shoppingList = new ArrayList<>();
+        
+        // 1. Identify low stock items
+        List<com.cafe.api.entity.inventory.InventoryItem> lowStockItems = 
+            inventoryRepository.findAll().stream()
+            .filter(item -> item.getQuantity() <= (item.getLowStockThreshold() != null ? item.getLowStockThreshold() : 0.0))
+            .toList();
+            
+        for (var item : lowStockItems) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("item", item.getName());
+            entry.put("current", item.getQuantity());
+            entry.put("unit", item.getUnit());
+            entry.put("priority", "CRITICAL");
+            entry.put("reason", "Below Threshold");
+            shoppingList.add(entry);
+        }
+        
+        // 2. High Demand Prediction logic
+        // If current revenue is trending up (growth > 10%), suggest stocking up top items
+        Double revenue = dashboardRepository.getTotalRevenue();
+        if (revenue != null && revenue > 1000) {
+            dashboardRepository.getTopSellingProducts().stream().limit(3).forEach(p -> {
+                ingredientRepository.findByProductId(p.getProductId()).forEach(ing -> {
+                    var inv = ing.getInventoryItem();
+                    // If predicted growth is high, suggest extra stock even if not low yet
+                    if (inv.getQuantity() < (ing.getQuantityRequired() * 50)) { // Arbitrary buffer
+                        Map<String, Object> entry = new HashMap<>();
+                        entry.put("item", "EXTRA " + inv.getName());
+                        entry.put("current", inv.getQuantity());
+                        entry.put("priority", "STRATEGIC");
+                        entry.put("reason", "High demand predicted for " + p.getName());
+                        shoppingList.add(entry);
+                    }
+                });
+            });
+        }
+
+        result.put("shoppingList", shoppingList);
+        result.put("smartAdvice", "Stock levels adjusted for predicted " + (revenue != null && revenue > 5000 ? "HIGH" : "NORMAL") + " trade volume.");
         return result;
     }
 
@@ -148,7 +188,13 @@ public class AIServiceImp implements AIService {
                 answer = "Market Data Insufficient. Begin distributing products to synthesize popularity vectors.";
             }
         } else {
-            answer = "Vector Query Received. Analysis of your tactical data suggests maintaining operational equilibrium. Consider executing a 'Pulse Scan' in the AI Features module for deeper strategic insights.";
+            String[] diagnostics = {
+                "Vector Query Received. Analysis of your tactical data suggests maintaining operational equilibrium.",
+                "Strategic Void Detected. I recommend initiating a 'Pulse Scan' of your sales metrics to synthesize new growth vectors.",
+                "Computational Threshold Reached. Operational data is currently within established margins.",
+                "Neural Buffering... Strategic alignment suggests focusing on resource procurement for the next fiscal epoch."
+            };
+            answer = diagnostics[random.nextInt(diagnostics.length)];
         }
         
         result.put("answer", answer);

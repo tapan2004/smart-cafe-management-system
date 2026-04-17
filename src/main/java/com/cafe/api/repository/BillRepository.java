@@ -23,12 +23,14 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
             """)
     Optional<Bill> findBillWithItems(@Param("uuid") String uuid);
 
-    @Query("select b from Bill b order by b.id desc")
+    @Query("select b from Bill b where b.isDeleted = false order by b.id desc")
     List<Bill> getAllBills();
 
-    @Query("select b from Bill b where b.createdBy=:username " +
+    @Query("select b from Bill b where b.createdBy=:username and b.isDeleted = false " +
             "order by b.id desc")
     List<Bill> getBillByUserName(@Param("username") String currentUser);
+    
+    long countByEmail(String email);
 
     @Query("SELECT HOUR(b.createdAt) as hour, COUNT(b.id) as count FROM Bill b GROUP BY HOUR(b.createdAt) ORDER BY COUNT(b.id) DESC")
     List<Object[]> getPeakHoursData();

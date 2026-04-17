@@ -12,6 +12,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import com.cafe.api.entity.users.User;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 @Entity
 @Data
@@ -32,13 +34,24 @@ public class Bill {
 
     private String paymentMethod;
     private Double total;
-    private String createdBy;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private User staff;
+    
+    private String createdBy; // Keep this for legacy/string logs if needed, or we can use staff.getEmail()
     
     @Enumerated(EnumType.STRING)
     private OrderStatus status = OrderStatus.PLACED;
 
+    private String tableNumber;
+    private String orderSource; // "WALK_IN" or "SCAN_ORDER"
+
     @CreationTimestamp
     private LocalDateTime createdAt;
+
+    private boolean isDeleted = false;
 
     @JsonManagedReference
     @OneToMany(mappedBy = "bill", cascade = CascadeType.ALL, fetch = FetchType.EAGER)

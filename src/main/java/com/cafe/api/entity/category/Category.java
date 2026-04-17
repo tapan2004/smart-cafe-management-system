@@ -34,4 +34,6 @@ public class Category {
     @JsonBackReference
     @OneToMany(mappedBy = "category", fetch = FetchType.EAGER)
     private List<Product> products;
+
+    private boolean isDeleted = false;
 }

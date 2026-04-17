@@ -83,8 +83,10 @@ public class CategoryServiceImpl implements CategoryService {
         log.info("Inside deleteCategory");
         Optional<Category> optional = categoryRepository.findById(id);
         if (optional.isPresent()) {
-            categoryRepository.deleteById(id);
-            return ResponseEntity.ok("Category Deleted Successfully");
+            Category category = optional.get();
+            category.setDeleted(true);
+            categoryRepository.save(category);
+            return ResponseEntity.ok("Category Soft-Deleted Successfully");
         }
         return new ResponseEntity<>("Category Not Found", HttpStatus.NOT_FOUND);
     }

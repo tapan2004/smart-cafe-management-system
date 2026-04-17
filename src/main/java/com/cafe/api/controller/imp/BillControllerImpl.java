@@ -40,4 +40,9 @@ public class BillControllerImpl implements BillController {
     public ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders() {
         return billService.getActiveOrders();
     }
-}
+
+    @Override
+    public ResponseEntity<String> placePublicOrder(BillRequestDTO request) {
+        return billService.placePublicOrder(request);
+    }
+}

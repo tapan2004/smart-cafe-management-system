@@ -1,258 +1,53 @@
-# ☕ AI-Powered Smart Cafe Management System
+# ☕ CafeFlow | AI-Powered Operational Backend
 
-## 🚀 Project Overview
+[![Spring Boot](https://img.shields.io/badge/SpringBoot-3.4-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Hibernate](https://img.shields.io/badge/Hibernate-JPA-59666C?logo=hibernate&logoColor=white)](https://hibernate.org/)
 
-The **AI-Powered Smart Cafe Management System** is a full-stack backend system designed to help cafe owners automate operations and make data-driven business decisions using Artificial Intelligence.
-
-This system combines **Java Spring Boot** for secure and scalable backend APIs with **Python-based Machine Learning models** to generate intelligent business insights such as sales forecasting, product recommendations, and peak-hour detection.
-
-The project simulates a real-world SaaS-style product architecture, focusing on scalability, security, and analytics-driven decision-making.
+The core intelligence node of the **CafeFlow** ecosystem. This Spring Boot application manages inventory logistics, transactional integrity, AI-driven insights, and real-time operational synchronization.
 
 ---
 
-## 🎯 Problem Statement
+## 🚀 Architectural Pillars
 
-Small and medium-sized cafes often struggle with:
+### 🧠 Neural Service Layer
+- **Cognitive Insights**: Context-aware engine that aggregates real-time sales data to provide tactical advice through the Neural Concierge.
+- **Strategic Recommendation Engine**: Pre-calculates high-probability item pairings for the frontend checkout flow.
 
-* Predicting future sales demand
-* Managing inventory efficiently
-* Identifying peak business hours
-* Understanding customer purchasing patterns
-* Making data-driven business decisions
+### 🛡️ Tactical Security & Audit
+- **Immutable Ledgering**: Specialized persistence layer for the **Operational Audit Trail**, capturing all high-risk system mutations.
+- **JWT Security**: State-less authentication protocol with role-based access control (RBAC).
 
-Manual analysis is time-consuming and prone to errors. This project addresses these challenges by integrating AI-driven analytics into daily cafe operations.
-
----
-
-## 💡 Solution
-
-I built a **scalable backend system** that integrates machine learning models with REST APIs to automate predictions and provide business insights in real time.
-
-The system:
-
-* Predicts future sales using historical transaction data
-* Recommends frequently bought product combinations
-* Detects peak business hours
-* Provides analytics through a unified dashboard API
-* Secures APIs using JWT-based authentication
+### 📦 Material & Inventory Management
+- **Ingredient-Level Tracking**: Automated stock deduction based on SKU components (e.g., deducting 30g coffee and 200ml milk for 1 Latte).
+- **Criticality Alerts**: Real-time identification of supply chain bottlenecks and low-stock thresholds.
 
 ---
 
-## 🧠 Key AI Features
-
-### 1. Sales Forecasting (Time-Series Prediction)
-
-* Implemented using **Facebook Prophet**
-* Predicts future sales demand based on historical data
-* Helps cafe owners plan inventory and staffing
-
-### 2. Product Recommendation System
-
-* Implemented using the **Apriori Algorithm**
-* Identifies frequently purchased product combinations
-* Improves upselling and cross-selling opportunities
-
-### 3. Peak Hour Detection
-
-* Analyzes transaction timestamps
-* Identifies busiest hours of the day
-* Helps optimize staff scheduling
-
-### 4. Stock Forecasting
-
-* Predicts product demand trends
-* Reduces overstocking and stock shortages
+## 🛠️ Technology Stack
+- **Framework**: Spring Boot 3 & Maven.
+- **Security**: Spring Security + JWT + BCrypt.
+- **Persistence**: Spring Data JPA + MySQL.
+- **Real-Time**: Spring Messaging (WebSockets) for KDS synchronization.
+- **Docs**: Swagger UI (OpenAPI 3).
 
 ---
 
-## 🏗️ System Architecture
+## ⚙️ Direct Deployment
 
-Frontend / Client
-|
-v
-Spring Boot REST API (Java)
-|
-v
-FastAPI ML Services (Python)
-|
-v
-MySQL Database
-
-### Architecture Highlights
-
-* Layered architecture (Controller → Service → Repository)
-* Microservice-style integration between Java and Python
-* Secure authentication using JWT tokens
-* RESTful API design
-* Scalable and modular structure
+### Setup
+1. Clone the repository: `git clone https://github.com/tapan2004/smart-cafe-management-system.git`
+2. Create a MySQL database named `Cafe`.
+3. Configure `application.properties` with your database credentials.
+4. Run: `mvn spring-boot:run`
 
 ---
 
-## ⚙️ Tech Stack
-
-### Backend
-
-* Java
-* Spring Boot
-* Spring Security
-* Spring Data JPA / Hibernate
-* REST APIs
-
-### AI / Machine Learning
-
-* Python
-* Scikit-learn
-* Facebook Prophet
-* Apriori Algorithm
-* Pandas
-* NumPy
-
-### Database
-
-* MySQL
-
-### Tools & DevOps
-
-* Git & GitHub
-* Postman
-* Maven
-* Docker (Basic)
-* Swagger API Documentation
-
----
-
-## 🔐 Security Features
-
-* JWT-based authentication
-* Role-based authorization
-* Secure REST endpoints
-* Input validation
-* Exception handling
-
----
-
-## 📊 Example API Modules
-
-* User Management API
-* Product Management API
-* Order Management API
-* Billing API
-* Analytics Dashboard API
-* Recommendation API
-* Forecasting API
-
----
-
-## 📈 Sample Business Insights Generated
-
-* Daily and monthly sales predictions
-* Top-selling products
-* Frequently bought product combinations
-* Peak-hour analysis
-* Revenue trends
-
----
-
-## 🧪 Testing
-
-* API testing using **Postman**
-* Input validation testing
-* Error handling verification
-* Endpoint security testing
-
----
-
-## 📦 Installation & Setup
-
-### Clone the Repository
-
-```
-git clone https://github.com/tapan2004/Smart-Cafe-Management-System.git
-cd Smart-Cafe-Management-System
-```
-
-### Backend Setup (Spring Boot)
-
-```
-mvn clean install
-mvn spring-boot:run
-```
-
-### Python ML Service Setup
-
-```
-pip install -r requirements.txt
-python app.py
-```
-
----
-
-## 🔄 API Workflow Example
-
-1. User logs in and receives JWT token
-2. User creates orders and transactions
-3. Transaction data is stored in MySQL
-4. AI models analyze data
-5. System returns predictions and recommendations
-
----
-
-## 📌 Real-World Use Cases
-
-* Cafe and restaurant management
-* Retail analytics systems
-* Inventory forecasting platforms
-* Business intelligence dashboards
-
----
-
-## 🧩 Future Improvements
-
-* Deploy using Docker containers
-* Add real-time dashboard visualization
-* Implement deep learning models
-* Add cloud deployment (AWS / Render)
-* Build frontend dashboard (React)
-
----
-
-## 👨‍💻 My Role in This Project
-
-I independently designed and developed this system end-to-end.
-
-Responsibilities included:
-
-* Designing backend architecture
-* Developing REST APIs using Spring Boot
-* Building machine learning models in Python
-* Integrating AI services with backend APIs
-* Implementing JWT authentication and security
-* Designing database schema
-* Testing APIs using Postman
-
----
-
-## 📎 GitHub Repository
-
-[https://github.com/tapan2004/Smart-Cafe-Management-System](https://github.com/tapan2004/Smart-Cafe-Management-System)
-
----
-
-## 📬 Contact
-
+## 👨‍💻 Author
 **Tapan Manna**
-Java Backend Developer | AI & Backend Enthusiast
-
-Email: [mannatapan588@gmail.com](mailto:mannatapan588@gmail.com)
-LinkedIn: [https://www.linkedin.com/in/tapan-manna/](https://www.linkedin.com/in/tapan-manna/)
-GitHub: [https://github.com/tapan2004](https://github.com/tapan2004)
+- GitHub: [@tapan2004](https://github.com/tapan2004)
+- Specialization: Enterprise Java & AI Strategy
 
 ---
 
-## ⭐ Why This Project Stands Out
-
-* Real-world business problem solving
-* Production-style backend architecture
-* Integration of AI with REST APIs
-* Focus on scalability and security
-* Designed like a product-based system
+> _"Orchestrating operational excellence with clean, concurrent code."_

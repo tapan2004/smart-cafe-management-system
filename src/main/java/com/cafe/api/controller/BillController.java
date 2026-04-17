@@ -24,4 +24,7 @@ public interface BillController {
 
     @GetMapping("/getActiveOrders")
     ResponseEntity<List<com.cafe.api.dto.response.OrderEventDTO>> getActiveOrders();
-}
+
+    @PostMapping("/public/placeOrder")
+    ResponseEntity<String> placePublicOrder(@RequestBody BillRequestDTO request);
+}

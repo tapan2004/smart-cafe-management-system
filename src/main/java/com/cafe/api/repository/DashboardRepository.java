@@ -13,12 +13,13 @@ public interface DashboardRepository extends JpaRepository<Bill, Integer> {
     // TOP SELLING PRODUCTS
     @Query("""
                 SELECT new com.cafe.api.dto.response.dashboard.TopProductDTO(
+                    p.id,
                     p.name,
                     SUM(b.quantity)
                 )
                 FROM BillItem b
                 JOIN b.product p
-                GROUP BY p.name
+                GROUP BY p.id, p.name
                 ORDER BY SUM(b.quantity) DESC
             """)
     List<TopProductDTO> getTopSellingProducts();

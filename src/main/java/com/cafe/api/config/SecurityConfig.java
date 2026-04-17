@@ -38,7 +38,10 @@ public class SecurityConfig {
                                 "/user/login",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/ws-cafe/**"
+                                "/ws-cafe/**",
+                                "/bill/public/**",
+                                "/category/get",
+                                "/product/category/**"
                         ).permitAll()
                         .requestMatchers("/user/**").hasAnyRole("ADMIN","MANAGER","STAFF","USER")
                         .anyRequest().authenticated()

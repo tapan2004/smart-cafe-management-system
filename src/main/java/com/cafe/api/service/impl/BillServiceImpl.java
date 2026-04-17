@@ -50,6 +50,7 @@ public class BillServiceImpl implements BillService {
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
     private final com.cafe.api.service.EmailService emailService;
     private final com.cafe.api.repository.AuditLogRepository auditLogRepository;
+    private final com.cafe.api.repository.UserRepository userRepository;
 
     // Cache to prevent email flooding (Stock ID -> Last Email Time)
     private final java.util.Map<Integer, Long> emailAlertTracker = new java.util.concurrent.ConcurrentHashMap<>();
@@ -361,7 +362,24 @@ public class BillServiceImpl implements BillService {
             bill.setEmail(request.getEmail().trim());
             bill.setContactNumber(request.getContactNumber().trim());
             bill.setPaymentMethod(request.getPaymentMethod());
-            bill.setCreatedBy(jwtFilter.getCurrentUser());
+            
+            // Set fields for Scan & Order
+            bill.setTableNumber(request.getTableNumber());
+            bill.setOrderSource(request.getOrderSource() != null ? request.getOrderSource() : "WALK_IN");
+            
+            String currentUser = jwtFilter.getCurrentUser();
+            bill.setCreatedBy(currentUser != null ? currentUser : "GUEST_CUSTOMER");
+            
+            if (currentUser != null) {
+                userRepository.findByEmail(currentUser).ifPresent(bill::setStaff);
+            }
+            
+            // LOYALTY SYSTEM: Check previous orders
+            long orderCount = billRepository.countByEmail(request.getEmail());
+            if (orderCount > 0 && (orderCount + 1) % 5 == 0) {
+                log.info("LOYALTY ALERT: Customer {} is eligible for a 10% discount on order #{}", request.getEmail(), orderCount + 1);
+                // We'll calculate the discount later in the loop or on total
+            }
 
             double total = 0;
             for (BillItemRequestDTO itemDTO : request.getItems()) {
@@ -384,6 +402,11 @@ public class BillServiceImpl implements BillService {
                 total += itemTotal;
             }
 
+            // Apply Loyalty Discount if eligible
+            if (orderCount > 0 && (orderCount + 1) % 5 == 0) {
+                 total = total * 0.90; // 10% Discount
+            }
+
             bill.setTotal(total);
             billRepository.saveAndFlush(bill);
 
@@ -393,8 +416,9 @@ public class BillServiceImpl implements BillService {
             // Log to Audit Trail
             auditLogRepository.save(new com.cafe.api.entity.AuditLog(
                 "BILL_GENERATED", 
-                jwtFilter.getCurrentUser(), 
-                "Generated Bill ID: " + bill.getUuid() + " for total ₹" + bill.getTotal()
+                bill.getCreatedBy(), 
+                "Generated Bill ID: " + bill.getUuid() + " for total ₹" + bill.getTotal() + 
+                (bill.getTableNumber() != null ? " [Table: " + bill.getTableNumber() + "]" : "")
             ));
 
         } catch (Exception e) {
@@ -527,10 +551,12 @@ public class BillServiceImpl implements BillService {
         try {
             Optional<Bill> optional = billRepository.findById(id);
             if (optional.isPresent()) {
-                billRepository.deleteById(id);
+                Bill bill = optional.get();
+                bill.setDeleted(true);
+                billRepository.save(bill);
 
                 return CafeUtils.getResponseEntity(
-                        "Bill Deleted Successfully",
+                        "Bill Soft-Deleted Successfully",
                         HttpStatus.OK
                 );
             }
@@ -548,7 +574,11 @@ public class BillServiceImpl implements BillService {
             com.cafe.api.dto.response.OrderEventDTO event = com.cafe.api.dto.response.OrderEventDTO.builder()
                     .uuid(request.getUuid())
                     .customerName(request.getName())
+                    .tableNumber(request.getTableNumber())
+                    .orderSource(request.getOrderSource() != null ? request.getOrderSource() : "WALK_IN")
                     .status(com.cafe.api.entity.bill.OrderStatus.PLACED)
+                    .placedAt(java.time.LocalDateTime.now())
+                    .priorityLevel("SCAN_ORDER".equals(request.getOrderSource()) ? "HIGH" : "NORMAL")
                     .items(request.getItems().stream().map(item -> {
                         Product product = productRepository.findById(item.getProductId()).orElse(null);
                         return com.cafe.api.dto.response.OrderEventDTO.OrderItemDTO.builder()
@@ -574,7 +604,11 @@ public class BillServiceImpl implements BillService {
                 com.cafe.api.dto.response.OrderEventDTO.builder()
                     .uuid(bill.getUuid())
                     .customerName(bill.getName())
+                    .tableNumber(bill.getTableNumber())
+                    .orderSource(bill.getOrderSource())
                     .status(bill.getStatus())
+                    .placedAt(bill.getCreatedAt())
+                    .priorityLevel("SCAN_ORDER".equals(bill.getOrderSource()) ? "HIGH" : "NORMAL")
                     .items(bill.getItems().stream().map(item -> 
                         com.cafe.api.dto.response.OrderEventDTO.OrderItemDTO.builder()
                                 .productName(item.getProduct().getName())
@@ -590,4 +624,25 @@ public class BillServiceImpl implements BillService {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-}
+
+    @Override
+    public ResponseEntity<String> placePublicOrder(BillRequestDTO request) {
+        log.info("Inside placePublicOrder for Table: {}", request.getTableNumber());
+        try {
+            if (request.getTableNumber() == null || request.getTableNumber().isEmpty()) {
+                return com.cafe.api.util.CafeUtils.getResponseEntity("Table Number is required for Scan & Order", HttpStatus.BAD_REQUEST);
+            }
+            
+            request.setOrderSource("SCAN_ORDER");
+            if (request.getPaymentMethod() == null) {
+                request.setPaymentMethod("UPI_PENDING");
+            }
+            
+            return generateReport(request);
+        } catch (Exception e) {
+            log.error("Error in placePublicOrder", e);
+            return com.cafe.api.util.CafeUtils.getResponseEntity(com.cafe.api.constant.CafeConstants.SOMETHING_WENT_WRONG, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+}
+
